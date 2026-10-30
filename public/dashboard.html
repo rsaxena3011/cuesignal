@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>CueSignal — Live chat producer</title>
+  <style>
+    :root { color-scheme: dark; --bg: #0c0b11; --panel: #15131d; --line: #2a2638; --text: #f6f3ff; --muted: #a49bb6; --purple: #9146ff; --green: #77e8bb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, a, input { -webkit-tap-highlight-color: transparent; }
+    button, input { font: inherit; }
+    button, .button { border: 1px solid var(--line); border-radius: 9px; background: #211b2e; color: var(--text); padding: 10px 15px; font-size: 13px; font-weight: 650; cursor: pointer; text-decoration: none; }
+    button:hover, .button:hover { background: #30233f; border-color: #76519b; }
+    button:disabled { cursor: default; opacity: .5; }
+    button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #bb90ff; outline-offset: 4px; }
+    .primary { background: var(--purple); border-color: var(--purple); color: white; }
+    .primary:hover { background: #a76cff; border-color: #a76cff; }
+    .quiet { background: transparent; color: #c2b8d1; }
+    .topbar { border-bottom: 1px solid var(--line); background: #100e17; }
+    .topbar-inner { max-width: 1400px; margin: auto; padding: 21px 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; font-weight: 750; font-size: 21px; letter-spacing: -.7px; }
+    .brand-mark { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; gap: 3px; border-radius: 10px; background: var(--purple); }
+    .brand-mark i { display: block; width: 3px; border-radius: 2px; background: white; }
+    .brand-mark i:nth-child(1), .brand-mark i:nth-child(4) { height: 9px; }
+    .brand-mark i:nth-child(2) { height: 20px; }
+    .brand-mark i:nth-child(3) { height: 14px; }
+    .top-actions { display: flex; align-items: center; gap: 16px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; border: 1px solid #453256; color: #d7b9ff; background: #241932; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; white-space: nowrap; }
+    .dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; flex-shrink: 0; }
+    main { max-width: 1400px; padding: 42px 40px 60px; margin: auto; }
+    .intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 29px; }
+    .eyebrow { color: #a999c2; font-size: 10px; font-weight: 750; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px; }
+    h1 { font-size: clamp(29px, 3vw, 39px); letter-spacing: -1.5px; line-height: 1.15; margin: 0 0 11px; font-weight: 700; }
+    .intro p:last-child { color: var(--muted); margin: 0; font-size: 14px; line-height: 1.65; }
+    .connection { font-size: 12px; color: var(--green); display: flex; align-items: center; gap: 7px; margin-top: 23px; white-space: nowrap; }
+    .connection.offline { color: #ffc48e; }
+    .notice { border: 1px solid #795a36; border-radius: 10px; background: #30241a; color: #ffdbb5; padding: 12px 16px; font-size: 13px; line-height: 1.5; margin-bottom: 22px; }
+    [hidden] { display: none !important; }
+    .on-air { position: relative; overflow: hidden; border: 1px solid #45305e; border-radius: 15px; padding: 27px 30px; background: linear-gradient(115deg, #21162f, #17131f 70%); display: flex; gap: 29px; align-items: center; min-height: 143px; }
+    .on-air-label { flex-shrink: 0; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+    .on-air-label .badge { color: #b6a8c8; border-color: #4a3a59; background: #281c35; }
+    .on-air.active .on-air-label .badge { color: #e2cfff; border-color: var(--purple); background: #6530ad; }
+    .on-air-label small { color: #a999ba; font-size: 10px; letter-spacing: .5px; }
+    .on-air-divider { width: 1px; height: 64px; background: #423051; flex-shrink: 0; }
+    .on-air-content { min-width: 0; flex: 1; }
+    .on-air h2 { font-size: 23px; font-weight: 600; letter-spacing: -.6px; margin: 0 0 10px; overflow-wrap: anywhere; }
+    .on-air p { color: #b1a1c5; font-size: 12px; margin: 0; line-height: 1.5; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 22px 0 34px; }
+    .metric { border: 1px solid var(--line); background: #121019; border-radius: 12px; padding: 18px 21px; display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .metric strong { font-size: 25px; font-weight: 650; letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; gap: 26px; }
+    .section-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin: 0 0 17px; }
+    .section-heading h2 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: -.3px; }
+    .section-heading span { color: #8f839f; font-size: 11px; }
+    .cue-list { display: flex; flex-direction: column; gap: 12px; }
+    .cue { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 13px; padding: 21px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .cue.featured { border-color: #7550a6; background: #1b1427; }
+    .rank { color: #8f819e; font-size: 13px; font-weight: 600; padding-top: 2px; font-variant-numeric: tabular-nums; }
+    .cue-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .cue-type { color: #bca0df; font-size: 9px; font-weight: 750; letter-spacing: 1.5px; text-transform: uppercase; }
+    .score { display: inline-flex; align-items: baseline; gap: 5px; color: #eee0ff; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .score small { color: #9483a7; font-size: 9px; letter-spacing: .7px; font-weight: 500; text-transform: uppercase; }
+    .cue h3 { margin: 0; font-size: 17px; font-weight: 550; line-height: 1.5; letter-spacing: -.2px; overflow-wrap: anywhere; }
+    .cue-meta { display: flex; flex-wrap: wrap; gap: 7px 15px; color: #a89ab8; font-size: 11px; margin-top: 12px; }
+    .cue-meta strong { color: #e2d7ef; font-weight: 650; }
+    .cue-bottom { border-top: 1px solid #2c2438; margin-top: 17px; padding-top: 14px; display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+    .users { color: #8e819e; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+    .cue-actions { display: flex; gap: 7px; flex-shrink: 0; }
+    .cue-actions button { font-size: 11px; padding: 8px 12px; }
+    .empty { border: 1px dashed #3e314e; border-radius: 12px; padding: 52px 24px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .empty strong { display: block; color: #e9ddf7; font-size: 17px; margin-bottom: 6px; }
+    .side-panel { border: 1px solid var(--line); background: #121019; border-radius: 12px; padding: 23px; margin-bottom: 16px; }
+    .side-panel h2 { margin: 0 0 12px; font-size: 14px; font-weight: 650; }
+    .side-panel p { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 0 0 16px; }
+    .mini-stage { height: 104px; position: relative; border: 1px solid #2e253d; border-radius: 8px; margin: 17px 0; background: radial-gradient(ellipse at 75% 20%, #342346, transparent 65%), #18131f; overflow: hidden; }
+    .mini-stage::after { content: "Your stream"; position: absolute; top: 16px; right: 16px; color: #73617e; font-size: 10px; }
+    .mini-card { position: absolute; bottom: 13px; left: 13px; right: 25px; border-left: 3px solid var(--purple); border-radius: 3px; background: #0b0913d9; padding: 10px; }
+    .mini-card b, .mini-card i { display: block; height: 4px; background: #bcafd1; border-radius: 3px; width: 75%; }
+    .mini-card i { margin-top: 6px; background: #645470; width: 40%; height: 3px; }
+    .side-panel label { display: block; color: #a999bd; font-size: 10px; margin-bottom: 8px; }
+    .overlay-url { width: 100%; border: 1px solid #32273f; border-radius: 7px; background: #0c0a10; color: #c8b6df; padding: 10px; font-size: 11px; }
+    .copy { width: 100%; margin-top: 10px; }
+    .steps { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.8; }
+    .steps li { padding-left: 4px; margin-bottom: 10px; }
+    .steps li:last-child { margin-bottom: 0; }
+    .steps strong { color: #d7c8e8; font-weight: 550; }
+    code { background: #251c32; color: #d6b7ff; border-radius: 4px; padding: 2px 5px; font-size: 11px; }
+    .local-note { color: #82748f; font-size: 11px; line-height: 1.7; padding: 0 6px; }
+    footer { margin-top: 37px; padding-top: 21px; border-top: 1px solid #241d2e; display: flex; justify-content: space-between; gap: 15px; color: #7e718d; font-size: 10px; letter-spacing: .3px; }
+    @media (max-width: 940px) { .workspace { grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; } main, .topbar-inner { padding-left: 24px; padding-right: 24px; } .cue { padding: 17px; } .cue-bottom { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 700px) { main { padding-top: 28px; } .workspace { grid-template-columns: 1fr; } .topbar-inner { padding: 16px; } main { padding-left: 16px; padding-right: 16px; } .top-actions { gap: 8px; } .top-actions .button { font-size: 11px; padding: 8px; } .brand { font-size: 18px; } .badge { font-size: 8px; letter-spacing: .7px; } .intro { flex-direction: column; gap: 8px; } .connection { margin-top: 0; } .on-air { padding: 21px; gap: 17px; align-items: flex-start; } .on-air-divider { display: none; } .on-air-label small { display: none; } .on-air h2 { font-size: 19px; } .on-air > button { display: none; } .metrics { gap: 8px; } .metric { display: block; padding: 14px 12px; } .metric-label { font-size: 10px; display: block; margin-bottom: 8px; } .metric strong { font-size: 23px; } aside { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .side-panel { margin: 0; padding: 18px; } .local-note { grid-column: 1 / -1; } footer { flex-direction: column; } }
+    @media (max-width: 430px) { .top-actions .button { display: none; } aside { grid-template-columns: 1fr; } .cue { grid-template-columns: 23px minmax(0, 1fr); gap: 8px; } }
+    @media (prefers-reduced-motion: no-preference) { button, .button { transition: background .15s, border-color .15s; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>CueSignal</div>
+      <div class="top-actions"><span class="badge" id="mode"><span class="dot"></span><span id="mode-text">CONNECTING</span></span><a class="button" href="/overlay" target="_blank" rel="noopener">Open overlay ↗</a></div>
+    </div>
+  </header>
+  <main>
+    <div class="intro">
+      <div><p class="eyebrow">Your live chat producer</p><h1>Find your next talking point.</h1><p id="mode-description">Repeated questions, clear priorities. You keep the conversation going.</p></div>
+      <div class="connection" id="connection"><span class="dot"></span><span id="connection-text">Connecting to feed</span></div>
+    </div>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section class="on-air" id="on-air" aria-label="Featured cue">
+      <div class="on-air-label"><span class="badge"><span class="dot"></span>ON AIR</span><small id="air-status">OVERLAY STANDBY</small></div>
+      <div class="on-air-divider" aria-hidden="true"></div>
+      <div class="on-air-content"><h2 id="featured-text">Make room for a great question.</h2><p id="featured-meta">Feature any cue below to send it to your stream overlay.</p></div>
+      <button class="quiet" id="clear-featured" hidden>Clear overlay</button>
+    </section>
+    <div class="metrics" aria-label="Queue statistics">
+      <div class="metric"><span class="metric-label">Cues in queue</span><strong id="cue-count">0</strong></div>
+      <div class="metric"><span class="metric-label">Messages in queue</span><strong id="message-count">0</strong></div>
+      <div class="metric"><span class="metric-label">Community boosts</span><strong id="boost-count">0</strong></div>
+    </div>
+    <div class="workspace">
+      <section aria-labelledby="queue-title">
+        <div class="section-heading"><h2 id="queue-title">Your cue queue</h2><span>Highest score first · refreshes every 2s</span></div>
+        <div class="cue-list" id="cue-list"></div>
+        <div class="empty" id="empty"><strong>Listening for the next cue</strong>Chat messages will appear here as the feed starts.<br>Similar messages come together in one card.</div>
+      </section>
+      <aside>
+        <section class="side-panel">
+          <p class="eyebrow">Made for your stream</p><h2>A question worth putting on air.</h2>
+          <div class="mini-stage" aria-hidden="true"><div class="mini-card"><b></b><i></i></div></div>
+          <p>Add this URL as a Browser Source in OBS. Use your canvas size, such as 1920 × 1080. The page background is transparent.</p>
+          <label for="overlay-url">OBS BROWSER SOURCE URL</label><input class="overlay-url" id="overlay-url" readonly aria-label="OBS browser source URL">
+          <button class="copy" id="copy-url">Copy overlay URL</button>
+        </section>
+        <section class="side-panel"><h2>Keep the conversation moving</h2><ol class="steps"><li><strong>Spot the signal.</strong> Repeated messages and boosts lift a cue up the queue.</li><li><strong>Put it on air.</strong> Feature a cue to show it on your overlay.</li><li><strong>Move to the next.</strong> Dismiss a cue when you’re done. <code>!boost</code> raises the top open cue.</li></ol></section>
+        <p class="local-note" id="local-note">Local text clustering. No external AI model. Simulated chat is clearly labeled in the header.</p>
+      </aside>
+    </div>
+    <footer><span>CUESIGNAL · Fewer missed questions. More conversation.</span><span>Local clustering & ranking · No external AI API</span></footer>
+  </main>
+  <template id="cue-template">
+    <article class="cue">
+      <div class="rank"></div>
+      <div>
+        <div class="cue-head"><span class="cue-type"></span><span class="score"><span class="score-number"></span><small>score</small></span></div>
+        <h3 class="cue-text"></h3>
+        <div class="cue-meta"><span><strong class="count-number"></strong> <span class="count-label"></span></span><span><strong class="boost-number"></strong> <span class="boost-label"></span></span><span class="cue-state"></span></div>
+        <div class="cue-bottom"><span class="users"></span><div class="cue-actions"><button class="quiet dismiss-button">Dismiss</button><button class="primary feature-button">Feature ↗</button></div></div>
+      </div>
+    </article>
+  </template>
+  <script>
+    const byId = (id) => document.getElementById(id);
+    const cards = new Map();
+    let cues = [];
+    let featured = null;
+    let busy = false;
+    let loading = false;
+    let sequence = 0;
+    let copyTimer;
+    const overlayUrl = new URL('/overlay', location.href).href;
+    byId('overlay-url').value = overlayUrl;
+
+    function notice(message) {
+      byId('notice').textContent = message;
+      byId('notice').hidden = !message;
+    }
+
+    function renderFeatured(cue) {
+      featured = cue;
+      byId('on-air').classList.toggle('active', Boolean(cue));
+      byId('air-status').textContent = cue ? 'SHOWING ON OVERLAY' : 'OVERLAY STANDBY';
+      byId('featured-text').textContent = cue ? cue.text : 'Make room for a great question.';
+      byId('featured-meta').textContent = cue ? `${cue.count} ${cue.count === 1 ? 'message' : 'messages'} grouped · ${cue.boosts} ${cue.boosts === 1 ? 'boost' : 'boosts'} · Featured on your OBS overlay` : 'Feature any cue below to send it to your stream overlay.';
+      byId('clear-featured').hidden = !cue;
+      byId('clear-featured').disabled = busy;
+    }
+
+    function refreshButtons() {
+      for (const cue of cues) {
+        const card = cards.get(cue.id);
+        if (!card) continue;
+        card.querySelector('.feature-button').disabled = busy || cue.status === 'featured';
+        card.querySelector('.dismiss-button').disabled = busy;
+      }
+      byId('clear-featured').disabled = busy;
+    }
+
+    function render(data) {
+      cues = data.cues;
+      byId('mode-text').textContent = data.mode;
+      byId('mode-description').textContent = data.mode === 'LIVE' ? 'Twitch connection enabled. Simulated chat also remains in this queue.' : 'Built-in simulated chat. Repeated questions, clear priorities.';
+      byId('local-note').textContent = data.mode === 'LIVE' ? 'LIVE means Twitch is configured; connection details appear in the server logs. The simulator remains active alongside real chat.' : 'This demo uses a simulated Twitch chat feed and local text clustering. No credentials or external AI model needed.';
+      byId('cue-count').textContent = cues.length;
+      byId('message-count').textContent = cues.reduce((sum, cue) => sum + cue.count, 0);
+      byId('boost-count').textContent = cues.reduce((sum, cue) => sum + cue.boosts, 0);
+      renderFeatured(cues.find((cue) => cue.status === 'featured') || null);
+      const list = byId('cue-list');
+      const focused = document.activeElement;
+      const ids = new Set(cues.map((cue) => cue.id));
+      for (const [id, card] of cards) {
+        if (!ids.has(id)) { card.remove(); cards.delete(id); }
+      }
+      cues.forEach((cue, index) => {
+        let card = cards.get(cue.id);
+        if (!card) {
+          card = byId('cue-template').content.firstElementChild.cloneNode(true);
+          card.querySelector('.feature-button').addEventListener('click', () => act(cue.id, 'feature'));
+          card.querySelector('.dismiss-button').addEventListener('click', () => act(cue.id, 'dismiss'));
+          cards.set(cue.id, card);
+        }
+        card.classList.toggle('featured', cue.status === 'featured');
+        card.querySelector('.rank').textContent = String(index + 1).padStart(2, '0');
+        card.querySelector('.cue-type').textContent = cue.isQuestion ? 'Question / request' : 'From the chat';
+        card.querySelector('.score-number').textContent = Number(cue.score).toFixed(1);
+        card.querySelector('.cue-text').textContent = cue.text;
+        card.querySelector('.count-number').textContent = cue.count;
+        card.querySelector('.count-label').textContent = cue.count === 1 ? 'message' : 'messages';
+        card.querySelector('.boost-number').textContent = cue.boosts;
+        card.querySelector('.boost-label').textContent = cue.boosts === 1 ? 'boost' : 'boosts';
+        card.querySelector('.cue-state').textContent = cue.status === 'featured' ? '● On air' : 'Ready to feature';
+        card.querySelector('.users').textContent = cue.users.length ? `From ${cue.users.map((user) => `@${user}`).join(', ')}` : 'From the community';
+        card.querySelector('.feature-button').textContent = cue.status === 'featured' ? 'On air' : 'Feature ↗';
+        card.querySelector('.feature-button').setAttribute('aria-label', `Feature: ${cue.text}`);
+        card.querySelector('.dismiss-button').setAttribute('aria-label', `Dismiss: ${cue.text}`);
+        if (list.children[index] !== card) list.insertBefore(card, list.children[index] || null);
+      });
+      if (focused && focused !== document.body && focused.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
+      byId('empty').hidden = cues.length > 0;
+      refreshButtons();
+    }
+
+    async function refresh(force = false) {
+      if (!force && (busy || loading)) return;
+      const current = ++sequence;
+      loading = true;
+      try {
+        const response = await fetch('/api/cues', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+        if (!response.ok) throw new Error('Could not read cue queue');
+        const data = await response.json();
+        if (current !== sequence) return;
+        render(data);
+        byId('connection').classList.remove('offline');
+        byId('connection-text').textContent = 'Queue connected';
+        notice('');
+      } catch (error) {
+        if (current !== sequence) return;
+        byId('connection').classList.add('offline');
+        byId('connection-text').textContent = 'Reconnecting';
+        notice('The server is unreachable. These cues may be out of date. Retrying automatically…');
+      } finally {
+        if (current === sequence) loading = false;
+      }
+    }
+
+    async function act(id, action) {
+      if (busy) return;
+      busy = true;
+      sequence += 1;
+      loading = false;
+      refreshButtons();
+      notice(action === 'feature' ? 'Sending cue to your overlay…' : 'Dismissing cue…');
+      try {
+        const response = await fetch(`/api/cues/${encodeURIComponent(id)}/${action}`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+        if (!response.ok) throw new Error('Could not update cue');
+        const state = await response.json();
+        renderFeatured(state.featured);
+        await refresh(true);
+      } catch (error) {
+        notice('That action could not be confirmed. Check the queue before trying again.');
+      } finally {
+        busy = false;
+        refreshButtons();
+      }
+    }
+
+    byId('clear-featured').addEventListener('click', () => { if (featured) act(featured.id, 'dismiss'); });
+    byId('copy-url').addEventListener('click', async () => {
+      clearTimeout(copyTimer);
+      try {
+        await navigator.clipboard.writeText(overlayUrl);
+        byId('copy-url').textContent = 'Copied to clipboard';
+      } catch {
+        byId('overlay-url').focus();
+        byId('overlay-url').select();
+        byId('copy-url').textContent = 'Select URL above and copy';
+      }
+      copyTimer = setTimeout(() => { byId('copy-url').textContent = 'Copy overlay URL'; }, 3000);
+    });
+    refresh();
+    setInterval(() => refresh(), 2000);
+  </script>
+</body>
+</html>

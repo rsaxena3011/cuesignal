@@ -1,0 +1,36 @@
+Build a complete, working Node.js application in this directory (C:\Users\user\C127-CueSignal). The project is called CueSignal: an AI live-chat producer for Twitch streamers. Work autonomously: create every file, install dependencies, run the tests, and fix any failures before finishing. Do not ask questions. Do not use any paid service or external AI API. Never write any real secret or API key into any file.
+
+CONTEXT AND HONESTY RULES
+- Default demo mode is a built-in SIMULATED Twitch chat feed, because no real Twitch credentials exist yet. Real Twitch mode must exist in code but stays inactive unless a git-ignored .env provides the values.
+- The clustering is local and deterministic (text normalization + token similarity). Describe it honestly in the README as local NLP-style clustering and ranking; do not claim an external LLM is used.
+
+REQUIRED FILES AND BEHAVIOR
+1. package.json: name "cuesignal", private true, type "module", engines node ">=20", scripts: "start": "node src/server.js", "test": "node --test". Only runtime dependency allowed: "ws". Everything else plain Node.
+2. src/cluster.js: the cue engine, pure and testable.
+   - normalize(text): lowercase, strip punctuation and emotes brackets, collapse whitespace, remove a small English stopword list, return token array.
+   - similarity(a, b): Jaccard similarity over token sets.
+   - class CueEngine: addMessage({user, text, ts}) -> if text is a boost command (starts with "!boost"), it boosts the currently top-ranked open cue (or a cue whose representative text contains the word after !boost, if given) and returns {type:"boost"}; otherwise it clusters the message: if similarity to an existing open cue's representative >= 0.5, join that cue (increment count, keep earliest representative, update lastTs, record up to 3 sample users); else create a new cue. Each cue: id, text (representative), count, boosts, users[], firstTs, lastTs, status ("open" | "featured" | "dismissed").
+   - score(cue) = count * 2 + boosts * 3 + recency bonus (decays with age; implement something simple and document it).
+   - list(): open and featured cues sorted by score desc.
+   - feature(id), dismiss(id): set status; featuring a cue un-features any other.
+   - A message counts as a question/request if it ends with "?" or starts with a question word or contains "please" / "can you" / "how do" etc.; non-question chatter should still be accepted but questions get a small ranking bonus. Document the rule in code comments.
+3. src/simulator.js: a simulated chat feed. An EventEmitter (or callback list) that every 900-1600 ms emits a fake chat message from a pool of ~14 usernames. Message templates must include several REPEATED and near-duplicate questions (e.g. "what sensitivity do you use?", "what sens do you use", "which sensitivity settings??", "when is the next tournament", "next tourney when?"), requests ("play ranked please", "can you play ranked"), hype chatter, and occasional "!boost" messages. It must be start/stop-able and deterministic enough for a demo (random is fine).
+4. src/eventsub.js: real Twitch EventSub WebSocket adapter, INACTIVE by default. Export a function startEventSub({clientId, userToken, channelId, onMessage}) that: connects to wss://eventsub.wss.twitch.tv/ws using the ws package; on session_welcome, POSTs a channel.chat.message subscription to https://api.twitch.tv/helix/eventsub/subscriptions with the session id as websocket transport; forwards channel chat message notifications to onMessage({user, text, ts}); handles session_reconnect by reconnecting to the provided URL; logs clearly. If any of the three values is missing, it must log "EventSub disabled: missing TWITCH_* env values" and return null without throwing.
+5. src/server.js: plain Node http server (no framework).
+   - Loads .env manually if present (tiny parser, no dotenv dependency): TWITCH_CLIENT_ID, TWITCH_USER_TOKEN, TWITCH_CHANNEL_ID, PORT.
+   - Creates one CueEngine. Chat source: simulator always starts in demo mode; if all three TWITCH_* values exist, ALSO start EventSub and log that real mode is on.
+   - Routes:
+     - GET / -> dashboard HTML (public/dashboard.html): shows ranked cue cards live (poll /api/cues every 2s), each card shows representative text, count, boosts, score, with "Feature" and "Dismiss" buttons that POST to the API. A header shows mode (SIMULATED FEED or LIVE) and a big "ON AIR" featured-cue banner.
+     - GET /overlay -> OBS browser-source overlay HTML (public/overlay.html): transparent background, shows ONLY the featured cue as a large clean lower-third card (question text, asked-by count, boosts), polls /api/state every 1s, hides itself when nothing is featured. This must look good on stream: dark glass card, white text, accent color #9146FF.
+     - GET /api/cues -> JSON {mode, cues: engine.list() with scores}
+     - GET /api/state -> JSON {mode, featured: cueOrNull, top: first 5 of list()}
+     - POST /api/cues/:id/feature and POST /api/cues/:id/dismiss -> apply and return updated state JSON.
+     - GET /health -> JSON {ok:true, mode}
+   - Serves the two HTML files from public/. Default PORT 4737 (env override).
+6. public/dashboard.html and public/overlay.html: self-contained (inline CSS/JS, no CDN, no external assets). Clean, professional, Twitch-purple accent. Dashboard works at desktop width; overlay must have a fully transparent page background.
+7. test/cluster.test.js: node:test unit tests covering: normalization, similarity of near-duplicates > 0.5 for "what sensitivity do you use" vs "what sens do you use"... wait: those share tokens {what, sens/sensitivity...} - choose test pairs that genuinely pass the implemented tokenizer, and adjust either the stopword/synonym handling so that sens~sensitivity maps together: implement a tiny synonym map in normalize (sens->sensitivity, tourney->tournament, pls->please, u->you). Tests must cover: two near-duplicate questions cluster into ONE cue with count 2; an unrelated message creates a second cue; !boost raises the top cue's boosts and its score; feature/dismiss transitions; dismissed cues leave list().
+8. .gitignore: node_modules/, .env, *.log
+9. .env.example: the three TWITCH_* keys with empty values and a comment that real mode is optional, plus PORT.
+10. README.md: title, one-line pitch, features, architecture (simulator + EventSub -> CueEngine -> dashboard/overlay), quickstart (npm install, npm start, open http://localhost:4737 and /overlay), how demo mode works, how to enable real Twitch mode (.env), npm test instructions, and a short "Built with Codex" note. Keep claims honest per the rules above.
+
+FINISH LINE: after creating everything, run "npm install" and "npm test" and fix failures until tests pass. Do NOT start the server (it never exits). In your final reply, list every file created and the exact test result summary line.

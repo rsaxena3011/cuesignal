@@ -1,0 +1,17 @@
+{
+  "name": "cuesignal",
+  "version": "1.0.0",
+  "description": "A local live-chat producer for Twitch streamers, with a simulated demo feed and OBS overlay.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}
